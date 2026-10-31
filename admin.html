@@ -338,7 +338,26 @@
     const SUPABASE_URL = 'https://turklfcpoaqzaouzesms.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_23pXoL6f2kdizx2iaJvoeQ_XzSmzaJH';
     
-    const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    // Verificar disponibilidad del SDK de Supabase
+    if (typeof window.supabase === 'undefined') {
+      console.error('El SDK de Supabase no se cargó correctamente.');
+      alert('Error al conectar con la base de datos. Por favor, recarga la página.');
+    }
+
+    const supabaseClient = window.supabase 
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+      : null;
+
+    // Función de seguridad: Escapar caracteres HTML (Protección contra XSS)
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
 
     let todosLosTurnos = [];
     let filtroActual = 'todos';
@@ -412,7 +431,7 @@
         .order('fecha_hora', { ascending: true });
 
       if (error) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding: 3rem; text-align: center; color: #ff5555;">Error al cargar los turnos: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 3rem; text-align: center; color: #ff5555;">Error al cargar los turnos: ${escapeHTML(error.message)}</td></tr>`;
         return;
       }
 
@@ -486,8 +505,13 @@
 
       let html = '';
       turnosFiltrados.forEach(t => {
-        const telLimpio = t.telefono.replace(/\D/g, '');
-        const msgWa = encodeURIComponent(`Hola ${t.nombre}, te escribimos de Cutz Studio para recordarte tu turno agendado.`);
+        const telLimpio = escapeHTML(t.telefono).replace(/\D/g, '');
+        const nombreEscapado = escapeHTML(t.nombre);
+        const telefonoEscapado = escapeHTML(t.telefono);
+        const servicioEscapado = escapeHTML(t.servicio);
+        const estadoEscapado = escapeHTML(t.estado);
+
+        const msgWa = encodeURIComponent(`Hola ${nombreEscapado}, te escribimos de Cutz Studio para recordarte tu turno agendado.`);
 
         html += `
           <tr>
@@ -497,10 +521,10 @@
                 <span class="datetime-time">${t.horaFormateada} hs</span>
               </div>
             </td>
-            <td><strong>${t.nombre}</strong></td>
-            <td>${t.telefono}</td>
-            <td>${t.servicio}</td>
-            <td><span class="badge">${t.estado}</span></td>
+            <td><strong>${nombreEscapado}</strong></td>
+            <td>${telefonoEscapado}</td>
+            <td>${servicioEscapado}</td>
+            <td><span class="badge">${estadoEscapado}</span></td>
             <td style="text-align: center;">
               <a href="https://wa.me/549${telLimpio}?text=${msgWa}" target="_blank" class="btn-wa-action" title="Contactar por WhatsApp">💬 WhatsApp</a>
               <button onclick="eliminarTurno('${t.id}')" class="btn-delete-action" title="Eliminar Turno">🗑️ Eliminar</button>
@@ -520,15 +544,15 @@
       const fecha = document.getElementById('m-fecha').value;
       const hora = document.getElementById('m-hora').value;
 
-      const [anio, mes, dia] = fecha.split('-');
-      const [h, m] = hora.split(':');
+      const [anio, mes, dia] = fecha.split('-').map(Number);
+      const [h, m] = hora.split(':').map(Number);
       const fechaLocalObj = new Date(anio, mes - 1, dia, h, m, 0);
       const isoString = fechaLocalObj.toISOString();
 
       const yaOcupado = todosLosTurnos.some(t => {
-        const d = new Date(t.fecha_hora);
-        const dStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        const hStr = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        const dateObj = new Date(t.fecha_hora);
+        const dStr = dateObj.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+        const hStr = dateObj.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false });
         return dStr === fecha && hStr === hora && (t.estado === 'confirmado' || t.estado === 'pendiente');
       });
 
@@ -567,6 +591,7 @@
         }
       }
     }
+    cargarTurnos();
   </script>
 </body>
 </html>

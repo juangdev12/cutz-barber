@@ -8,6 +8,17 @@ document.addEventListener('DOMContentLoaded', function() {
   function $(s) { return document.querySelector(s); }
   function $$(s) { return document.querySelectorAll(s); }
 
+  // Función de seguridad: Escapar caracteres HTML (Protección contra XSS)
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   /* ==========================================
      MENÚ DESPLEGABLE MINIMALISTA (HAMBURGUESA)
      ========================================== */
@@ -187,11 +198,23 @@ document.addEventListener('DOMContentLoaded', function() {
     bookingForm.addEventListener('submit', async function(e) {
       e.preventDefault();
 
+      // Control Anti-Spam: Limitar reservas consecutivas por dispositivo (2 minutos)
+      const ultimaReserva = localStorage.getItem('cutz_last_booking');
+      const ahora = Date.now();
+      if (ultimaReserva && (ahora - Number(ultimaReserva) < 120000)) {
+        alert('Por favor, aguarda un par de minutos antes de realizar otra reserva.');
+        return;
+      }
+
       const servicio = $('#s').value;
       const fecha = $('#fecha-input').value;
       const hora = horaSeleccionadaInput ? horaSeleccionadaInput.value : '';
-      const nombre = $('#n').value.trim();
-      const telefono = $('#t').value.trim();
+      const nombreRaw = $('#n').value.trim();
+      const telefonoRaw = $('#t').value.trim();
+
+      // Sanitizado de datos
+      const nombre = escapeHTML(nombreRaw);
+      const telefono = escapeHTML(telefonoRaw);
 
       if (!hora) {
         alert('Por favor, selecciona un horario disponible.');
@@ -238,8 +261,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
+      // Guardar marca de tiempo para evitar spam
+      localStorage.setItem('cutz_last_booking', Date.now());
+
       const fechaFormateada = new Date(anio, mes - 1, dia).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-      const mensaje = encodeURIComponent(`Hola! Reservé un turno en Cutz Studio.\n\n👤 Nombre: ${nombre}\n✂️ Servicio: ${servicio}\n📅 Fecha: ${fechaFormateada}\n⏰ Hora: ${hora} hs`);
+      const mensaje = encodeURIComponent(`Hola! Reservé un turno en Cutz Studio.\n\n👤 Nombre: ${nombreRaw}\n✂️ Servicio: ${servicio}\n📅 Fecha: ${fechaFormateada}\n⏰ Hora: ${hora} hs`);
       
       window.open(`https://wa.me/5492478516972?text=${mensaje}`, '_blank');
       
